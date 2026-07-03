@@ -1,0 +1,32 @@
+{
+  "name": "agentic-wallet-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "wallet": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/cli/index.ts",
+    "build": "tsc",
+    "start": "node dist/cli/index.js",
+    "typecheck": "tsc --noEmit",
+    "eval:nl": "tsx scripts/run-nl-intent-eval.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.3",
+    "ai": "^7.0.11",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "viem": "^2.54.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "ws": "^8.21.0"
+  }
+}
