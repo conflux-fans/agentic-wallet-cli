@@ -1,0 +1,11 @@
+{
+  "name": "uniswap-v2",
+  "version": "0.1.0",
+  "description": "Uniswap V2 pool, exact-in/exact-out quote, swap, and liquidity tools with multi-hop routing for ERC20 and native CFX",
+  "enabled": true,
+  "permissions": {
+    "readRpc": true,
+    "prepareTransactions": true,
+    "writeLocalFiles": false
+  }
+}

@@ -15,6 +15,7 @@ import {
   getNativeBalance,
   type Erc20TokenInput
 } from "../wallet/client.js";
+import type { ScanApiConfig } from "../history/index.js";
 import { createLogger } from "../logger.js";
 import {
   formatAccountInfo,
@@ -49,7 +50,17 @@ function createRuntime(verbose: boolean) {
   });
   const addressBook = createAddressBook();
   const wallet = createWalletContext(env.privateKey, chains, logger);
-  return { env, chains, tokens, addressBook, wallet };
+  const scanApis: ScanApiConfig = {
+    conflux: {
+      apiUrl: env.confluxScanApiUrl,
+      apiKey: env.confluxScanApiKey
+    },
+    monad: {
+      apiUrl: env.monadScanApiUrl,
+      apiKey: env.monadScanApiKey
+    }
+  };
+  return { env, chains, tokens, addressBook, wallet, scanApis };
 }
 
 function printError(error: unknown) {
@@ -105,7 +116,7 @@ program
   .option("-v, --verbose", "print external LLM and web3 RPC call diagnostics")
   .action(async (options: { verbose?: boolean }) => {
     try {
-      const { env, wallet, tokens, addressBook } = createRuntime(isVerbose(options));
+      const { env, wallet, tokens, addressBook, scanApis } = createRuntime(isVerbose(options));
       const session = createAgentSession();
       const rl = readline.createInterface({ input, output });
 
@@ -136,6 +147,7 @@ program
               tokens,
               wallet.chains,
               addressBook,
+              scanApis,
               session
             );
           } finally {

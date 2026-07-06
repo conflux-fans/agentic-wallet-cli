@@ -1,0 +1,7 @@
+{
+  "conflux": {
+    "router": "0x62b0873055bf896dd869e172119871ac24aea305",
+    "factory": "0xe2a6f7c0ce4d5d300f97aa7e125455f5cd3342f5",
+    "wrappedNative": "0x14b2d3bc65e74dae1030eafd8ac30c533c976a9b"
+  }
+}

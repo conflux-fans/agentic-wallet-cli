@@ -10,6 +10,10 @@ export type AppEnv = {
   confluxUsdcAddress?: `0x${string}`;
   monadUsdtAddress?: `0x${string}`;
   monadUsdcAddress?: `0x${string}`;
+  confluxScanApiUrl?: string;
+  confluxScanApiKey?: string;
+  monadScanApiUrl?: string;
+  monadScanApiKey?: string;
 };
 
 function requireEnv(name: string): string {
@@ -51,6 +55,10 @@ export function loadEnv(): AppEnv {
     confluxUsdtAddress: optionalAddress("CONFLUX_USDT_ADDRESS"),
     confluxUsdcAddress: optionalAddress("CONFLUX_USDC_ADDRESS"),
     monadUsdtAddress: optionalAddress("MONAD_USDT_ADDRESS"),
-    monadUsdcAddress: optionalAddress("MONAD_USDC_ADDRESS")
+    monadUsdcAddress: optionalAddress("MONAD_USDC_ADDRESS"),
+    confluxScanApiUrl: process.env.CONFLUX_SCAN_API_URL || "https://evmapi.confluxscan.io/api",
+    confluxScanApiKey: process.env.CONFLUX_SCAN_API_KEY,
+    monadScanApiUrl: process.env.MONAD_SCAN_API_URL,
+    monadScanApiKey: process.env.MONAD_SCAN_API_KEY
   };
 }

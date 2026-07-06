@@ -1,4 +1,5 @@
 import {
+  decodeEventLog,
   encodeFunctionData,
   createPublicClient,
   createWalletClient,
@@ -121,7 +122,38 @@ export type Erc20ApprovePlan = {
   estimatedFee: bigint;
 };
 
-export type TransactionPlan = NativeTransferPlan | Erc20TransferPlan | Erc20ApprovePlan;
+export type ContractCallPlan = {
+  id: string;
+  kind: "contract-call";
+  chain: ChainKey;
+  chainName: string;
+  protocol: string;
+  action: string;
+  from: Address;
+  to: Address;
+  value: bigint;
+  data: Hex;
+  summary: string[];
+  metadata?: ContractCallMetadata;
+  estimatedGas: bigint;
+  estimatedFee: bigint;
+};
+
+export type ContractCallMetadata = {
+  kind: "uniswap-v2-swap";
+  path: Array<{
+    address: Address;
+    symbol?: string;
+    decimals?: number;
+  }>;
+  pairs: Address[];
+};
+
+export type TransactionPlan =
+  | NativeTransferPlan
+  | Erc20TransferPlan
+  | Erc20ApprovePlan
+  | ContractCallPlan;
 
 export type Erc20TokenInput = {
   address: Address;
@@ -136,9 +168,25 @@ export type SentTransactionResult = {
   status: "success" | "reverted" | "pending" | "unknown";
   blockNumber?: bigint;
   gasUsed?: bigint;
+  details?: string[];
   explorerUrl?: string;
   receiptError?: string;
 };
+
+const uniswapV2SwapEventAbi = [
+  {
+    type: "event",
+    name: "Swap",
+    inputs: [
+      { name: "sender", type: "address", indexed: true },
+      { name: "amount0In", type: "uint256", indexed: false },
+      { name: "amount1In", type: "uint256", indexed: false },
+      { name: "amount0Out", type: "uint256", indexed: false },
+      { name: "amount1Out", type: "uint256", indexed: false },
+      { name: "to", type: "address", indexed: true }
+    ]
+  }
+] as const;
 
 export function createWalletContext(
   privateKey: Hex,
@@ -475,6 +523,64 @@ export async function prepareErc20Approve(
   };
 }
 
+export async function prepareContractCall(
+  ctx: WalletContext,
+  input: {
+    id: string;
+    chain: ChainKey;
+    protocol: string;
+    action: string;
+    to: Address;
+    value?: bigint;
+    data: Hex;
+    summary: string[];
+    metadata?: ContractCallMetadata;
+  }
+): Promise<ContractCallPlan> {
+  const config = ctx.chains[input.chain];
+  const publicClient = getPublicClient(config);
+  const value = input.value ?? 0n;
+  ctx.logger.log("web3 rpc call", {
+    chain: config.displayName,
+    endpoint: redactUrl(config.rpcUrl),
+    method: "eth_estimateGas",
+    protocol: input.protocol,
+    action: input.action,
+    from: ctx.account.address,
+    to: input.to,
+    value: value.toString()
+  });
+  const estimatedGas = await publicClient.estimateGas({
+    account: ctx.account.address,
+    to: input.to,
+    value,
+    data: input.data
+  });
+  ctx.logger.log("web3 rpc call", {
+    chain: config.displayName,
+    endpoint: redactUrl(config.rpcUrl),
+    method: "eth_gasPrice"
+  });
+  const gasPrice = await publicClient.getGasPrice();
+
+  return {
+    id: input.id,
+    kind: "contract-call",
+    chain: input.chain,
+    chainName: config.displayName,
+    protocol: input.protocol,
+    action: input.action,
+    from: ctx.account.address,
+    to: input.to,
+    value,
+    data: input.data,
+    summary: input.summary,
+    metadata: input.metadata,
+    estimatedGas,
+    estimatedFee: estimatedGas * gasPrice
+  };
+}
+
 export async function sendPreparedTransaction(
   ctx: WalletContext,
   plan: TransactionPlan
@@ -511,6 +617,7 @@ export async function sendPreparedTransaction(
       status: receipt.status,
       blockNumber: receipt.blockNumber,
       gasUsed: receipt.gasUsed,
+      details: plan.kind === "contract-call" ? parseContractCallReceipt(plan, receipt.logs) : undefined,
       explorerUrl: config.explorerUrl ? `${config.explorerUrl}/tx/${hash}` : undefined
     };
   } catch (error) {
@@ -523,6 +630,74 @@ export async function sendPreparedTransaction(
       receiptError: error instanceof Error ? error.message : String(error)
     };
   }
+}
+
+function parseContractCallReceipt(plan: ContractCallPlan, logs: readonly unknown[]): string[] | undefined {
+  if (plan.metadata?.kind !== "uniswap-v2-swap") {
+    return undefined;
+  }
+
+  const hopDetails = plan.metadata.pairs
+    .map((pair, index) => parseUniswapV2SwapHop(pair, plan.metadata!.path[index], plan.metadata!.path[index + 1], logs))
+    .filter((detail): detail is { input: bigint; output: bigint; inputSymbol: string; outputSymbol: string; outputDecimals: number } => Boolean(detail));
+
+  if (hopDetails.length === 0) {
+    return undefined;
+  }
+
+  const lastHop = hopDetails[hopDetails.length - 1];
+  return [
+    `实际输出：${formatTokenAmount(lastHop.output, lastHop.outputDecimals)} ${lastHop.outputSymbol}`,
+    `成交路径：${plan.metadata.path.map((token) => token.symbol ?? token.address).join(" -> ")}`
+  ];
+}
+
+function parseUniswapV2SwapHop(
+  pair: Address,
+  tokenIn: { address: Address; symbol?: string; decimals?: number },
+  tokenOut: { address: Address; symbol?: string; decimals?: number },
+  logs: readonly unknown[]
+):
+  | {
+      input: bigint;
+      output: bigint;
+      inputSymbol: string;
+      outputSymbol: string;
+      outputDecimals: number;
+    }
+  | undefined {
+  const pairAddress = pair.toLowerCase();
+  for (const log of logs as Array<{ address?: Address; data?: Hex; topics?: readonly Hex[] }>) {
+    if (log.address?.toLowerCase() !== pairAddress || !log.data || !log.topics) {
+      continue;
+    }
+
+    try {
+      const decoded = decodeEventLog({
+        abi: uniswapV2SwapEventAbi,
+        data: log.data,
+        topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]]
+      });
+      if (decoded.eventName !== "Swap") {
+        continue;
+      }
+
+      const tokenInIsToken0 = tokenIn.address.toLowerCase() < tokenOut.address.toLowerCase();
+      const input = tokenInIsToken0 ? decoded.args.amount0In : decoded.args.amount1In;
+      const output = tokenInIsToken0 ? decoded.args.amount1Out : decoded.args.amount0Out;
+      return {
+        input,
+        output,
+        inputSymbol: tokenIn.symbol ?? tokenIn.address,
+        outputSymbol: tokenOut.symbol ?? tokenOut.address,
+        outputDecimals: tokenOut.decimals ?? 18
+      };
+    } catch {
+      continue;
+    }
+  }
+
+  return undefined;
 }
 
 async function resolveErc20Metadata(
@@ -581,6 +756,16 @@ async function sendPlan(
       abi: erc20Abi,
       functionName: "transfer",
       args: [plan.to, plan.rawAmount]
+    });
+  }
+
+  if (plan.kind === "contract-call") {
+    return walletClient.sendTransaction({
+      account,
+      chain,
+      to: plan.to,
+      value: plan.value,
+      data: plan.data
     });
   }
 
