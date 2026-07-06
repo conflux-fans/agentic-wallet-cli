@@ -128,7 +128,7 @@ export async function handleUserInput(
 
   const systemPrompt = [
     "你是一个 Agentic EVM Wallet 的命令行助手。",
-    "当前只支持 Conflux eSpace(conflux) 和 Monad(monad)。",
+    `当前支持的链：${Object.values(chains).map((c) => `${c.displayName}(${c.key})`).join("、")}。`,
     "当前支持 native 资产余额、nonce 查询，以及 native 转账准备。",
     "ERC20 支持 token 白名单查询、余额查询、allowance 查询、approve 准备和 transfer 准备。",
     "ERC20 token 列表支持查询、增加、删除、修改；内置 token 包括 USDT 和 USDC；也支持用户直接指定 ERC20 token 地址。",

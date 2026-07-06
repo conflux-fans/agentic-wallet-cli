@@ -3,7 +3,7 @@ import { Command } from "commander";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { isAddress, type Address } from "viem";
-import { parseChainKey, createChainRegistry } from "../chains/index.js";
+import { assertChainKey, createChainRegistry, chainKeys } from "../chains/index.js";
 import { loadEnv } from "../config/env.js";
 import { handleUserInput } from "../agent/index.js";
 import { createAgentSession } from "../agent/session.js";
@@ -38,28 +38,18 @@ import { formatAddressBookEntry, formatAddressBookList } from "./address-book-fo
 function createRuntime(verbose: boolean) {
   const env = loadEnv();
   const logger = createLogger(verbose);
-  const chains = createChainRegistry({
-    confluxRpcUrl: env.confluxRpcUrl,
-    monadRpcUrl: env.monadRpcUrl
-  });
-  const tokens = createTokenRegistry({
-    confluxUsdtAddress: env.confluxUsdtAddress,
-    confluxUsdcAddress: env.confluxUsdcAddress,
-    monadUsdtAddress: env.monadUsdtAddress,
-    monadUsdcAddress: env.monadUsdcAddress
-  });
+  const rpcUrls: Record<string, string> = {};
+  const tokenOverrides: Record<string, Record<string, `0x${string}`>> = {};
+  const scanApis: ScanApiConfig = {};
+  for (const [key, chainEnv] of Object.entries(env.chains)) {
+    rpcUrls[key] = chainEnv.rpcUrl;
+    tokenOverrides[key] = chainEnv.tokens;
+    scanApis[key] = { apiUrl: chainEnv.scan.apiUrl, apiKey: chainEnv.scan.apiKey };
+  }
+  const chains = createChainRegistry(rpcUrls);
+  const tokens = createTokenRegistry(tokenOverrides);
   const addressBook = createAddressBook();
   const wallet = createWalletContext(env.privateKey, chains, logger);
-  const scanApis: ScanApiConfig = {
-    conflux: {
-      apiUrl: env.confluxScanApiUrl,
-      apiKey: env.confluxScanApiKey
-    },
-    monad: {
-      apiUrl: env.monadScanApiUrl,
-      apiKey: env.monadScanApiKey
-    }
-  };
   return { env, chains, tokens, addressBook, wallet, scanApis };
 }
 
@@ -82,7 +72,7 @@ function isVerbose(options?: { verbose?: boolean }) {
 
 function resolveCliToken(
   registry: TokenRegistry,
-  chain: ReturnType<typeof parseChainKey>,
+  chain: string,
   options: { token?: string; tokenAddress?: string }
 ): Erc20TokenInput {
   if (options.tokenAddress !== undefined) {
@@ -169,19 +159,19 @@ program
 program
   .command("account")
   .description("Show account address, native balance, and nonce")
-  .requiredOption("-c, --chain <chain>", "chain key: conflux or monad")
+  .requiredOption("-c, --chain <chain>", `chain key: ${chainKeys().join(" | ")}`)
   .option("-a, --address <address>", "EVM address to query. Defaults to current wallet")
   .option("-v, --verbose", "print external web3 RPC call diagnostics")
   .action(async (options: { chain: string; address?: string; verbose?: boolean }) => {
     try {
-      const { wallet } = createRuntime(isVerbose(options));
+      const { wallet, chains } = createRuntime(isVerbose(options));
       if (options.address !== undefined && !isAddress(options.address)) {
         throw new Error("Invalid EVM address");
       }
 
       const info = await getAccountInfo(
         wallet,
-        parseChainKey(options.chain),
+        assertChainKey(chains, options.chain),
         options.address as Address | undefined
       );
       console.log(formatAccountInfo(info));
@@ -194,19 +184,19 @@ program
 program
   .command("balance")
   .description("Show native balance")
-  .requiredOption("-c, --chain <chain>", "chain key: conflux or monad")
+  .requiredOption("-c, --chain <chain>", `chain key: ${chainKeys().join(" | ")}`)
   .option("-a, --address <address>", "EVM address to query. Defaults to current wallet")
   .option("-v, --verbose", "print external web3 RPC call diagnostics")
   .action(async (options: { chain: string; address?: string; verbose?: boolean }) => {
     try {
-      const { wallet } = createRuntime(isVerbose(options));
+      const { wallet, chains } = createRuntime(isVerbose(options));
       if (options.address !== undefined && !isAddress(options.address)) {
         throw new Error("Invalid EVM address");
       }
 
       const balance = await getNativeBalance(
         wallet,
-        parseChainKey(options.chain),
+        assertChainKey(chains, options.chain),
         options.address as Address | undefined
       );
       console.log(formatNativeBalance(balance));
@@ -219,11 +209,11 @@ program
 program
   .command("tokens")
   .description("Show whitelisted ERC20 tokens")
-  .requiredOption("-c, --chain <chain>", "chain key: conflux or monad")
+  .requiredOption("-c, --chain <chain>", `chain key: ${chainKeys().join(" | ")}`)
   .action((options: { chain: string }) => {
     try {
       const { chains, tokens } = createRuntime(false);
-      const chain = parseChainKey(options.chain);
+      const chain = assertChainKey(chains, options.chain);
       console.log(formatWhitelistedTokens(chains[chain].displayName, getWhitelistedTokens(tokens, chain)));
     } catch (error) {
       printError(error);
@@ -234,7 +224,7 @@ program
 program
   .command("erc20-balance")
   .description("Show ERC20 token balance")
-  .requiredOption("-c, --chain <chain>", "chain key: conflux or monad")
+  .requiredOption("-c, --chain <chain>", `chain key: ${chainKeys().join(" | ")}`)
   .option("-t, --token <symbol>", "whitelisted token symbol: USDT or USDC")
   .option("--token-address <address>", "ERC20 token contract address")
   .option("-a, --address <address>", "EVM address to query. Defaults to current wallet")
@@ -248,8 +238,8 @@ program
       verbose?: boolean;
     }) => {
       try {
-        const { wallet, tokens } = createRuntime(isVerbose(options));
-        const chain = parseChainKey(options.chain);
+        const { wallet, tokens, chains } = createRuntime(isVerbose(options));
+        const chain = assertChainKey(chains, options.chain);
         if (options.address !== undefined && !isAddress(options.address)) {
           throw new Error("Invalid EVM address");
         }
@@ -271,7 +261,7 @@ program
 program
   .command("erc20-allowance")
   .description("Show ERC20 allowance")
-  .requiredOption("-c, --chain <chain>", "chain key: conflux or monad")
+  .requiredOption("-c, --chain <chain>", `chain key: ${chainKeys().join(" | ")}`)
   .requiredOption("-s, --spender <address>", "spender address")
   .option("-t, --token <symbol>", "whitelisted token symbol: USDT or USDC")
   .option("--token-address <address>", "ERC20 token contract address")
@@ -287,8 +277,8 @@ program
       verbose?: boolean;
     }) => {
       try {
-        const { wallet, tokens } = createRuntime(isVerbose(options));
-        const chain = parseChainKey(options.chain);
+        const { wallet, tokens, chains } = createRuntime(isVerbose(options));
+        const chain = assertChainKey(chains, options.chain);
         if (!isAddress(options.spender)) {
           throw new Error("Invalid spender address");
         }
