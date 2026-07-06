@@ -10,7 +10,7 @@ import {
 import { tool } from "ai";
 import { z } from "zod";
 import { defineSkill, type SkillContext } from "./sdk.js";
-import type { ChainKey } from "../chains/index.js";
+import { chainEnumSchema, type ChainKey } from "../chains/index.js";
 
 type UniswapV2Config = Partial<
   Record<ChainKey, { router: Address; factory: Address; wrappedNative: Address }>
@@ -261,7 +261,7 @@ const erc20AllowanceAbi = [
 
 export function createUniswapV2Skill(ctx: SkillContext) {
   const config = ctx.config.readJson<UniswapV2Config>("config.json");
-  const chainSchema = z.enum(["conflux"]);
+  const chainSchema = chainEnumSchema(Object.keys(config));
   const tokenInputSchema = z.object({
     symbol: z.string().optional().describe("token symbol，例如 USDT 或 CFX"),
     address: z.string().optional().describe("token 地址")
@@ -280,7 +280,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
           tokenB: tokenInputSchema
         }),
         execute: async ({ chain, tokenA, tokenB }) => {
-          const chainKey = chain as ChainKey;
+          const chainKey = chain;
           const skillConfig = requireConfig(config, chainKey);
           rejectPlaceholderConfig(skillConfig);
           const resolvedA = resolveSwapToken(ctx, chainKey, skillConfig, tokenA);
@@ -341,7 +341,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
           maxHops: z.number().int().min(1).max(4).optional().describe("最多经过多少个池子，默认 4")
         }),
         execute: async ({ chain, tokenIn, tokenOut, mode, amountIn, amountOut, maxHops }) => {
-          const chainKey = chain as ChainKey;
+          const chainKey = chain;
           const skillConfig = requireConfig(config, chainKey);
           rejectPlaceholderConfig(skillConfig);
           rejectWrappedNativePlaceholder(skillConfig);
@@ -385,7 +385,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
           recipient: z.string().optional().describe("接收方地址或地址簿联系人，默认当前钱包")
         }),
         execute: async ({ chain, tokenIn, tokenOut, mode, amountIn, amountOut, slippageBps, maxHops, recipient }) => {
-          const chainKey = chain as ChainKey;
+          const chainKey = chain;
           const skillConfig = requireConfig(config, chainKey);
           rejectPlaceholderConfig(skillConfig);
           rejectWrappedNativePlaceholder(skillConfig);
@@ -476,7 +476,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
           owner: z.string().optional().describe("LP 持有人地址或地址簿联系人，默认当前钱包")
         }),
         execute: async ({ chain, tokenA, tokenB, owner }) => {
-          const chainKey = chain as ChainKey;
+          const chainKey = chain;
           const skillConfig = requireConfig(config, chainKey);
           rejectPlaceholderConfig(skillConfig);
           rejectWrappedNativePlaceholder(skillConfig);
@@ -517,7 +517,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
           recipient: z.string().optional().describe("LP 接收方地址或地址簿联系人，默认当前钱包")
         }),
         execute: async ({ chain, tokenA, tokenB, amountA, amountB, slippageBps, recipient }) => {
-          const chainKey = chain as ChainKey;
+          const chainKey = chain;
           const skillConfig = requireConfig(config, chainKey);
           rejectPlaceholderConfig(skillConfig);
           rejectWrappedNativePlaceholder(skillConfig);
@@ -605,7 +605,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
           recipient: z.string().optional().describe("底层资产接收方地址或地址簿联系人，默认当前钱包")
         }),
         execute: async ({ chain, tokenA, tokenB, liquidity, slippageBps, recipient }) => {
-          const chainKey = chain as ChainKey;
+          const chainKey = chain;
           const skillConfig = requireConfig(config, chainKey);
           rejectPlaceholderConfig(skillConfig);
           rejectWrappedNativePlaceholder(skillConfig);
