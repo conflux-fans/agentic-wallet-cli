@@ -6,13 +6,13 @@ import type { NativeTransferPlan } from "../wallet/client.js";
 const monadPlan: NativeTransferPlan = {
   id: "1",
   kind: "native-transfer",
-  chain: "monad",
-  chainName: "Monad",
-  nativeSymbol: "MON",
+  chain: "base",
+  chainName: "Base",
+  nativeSymbol: "ETH",
   from: "0x0000000000000000000000000000000000000001",
   to: "0x0000000000000000000000000000000000000002",
   amount: "1",
-  symbol: "MON",
+  symbol: "ETH",
   value: 1_000_000_000_000_000_000n,
   estimatedGas: 21000n,
   estimatedFee: 21_000_000_000_000n
@@ -20,6 +20,7 @@ const monadPlan: NativeTransferPlan = {
 
 test("formatTransactionPlan renders the chain's native symbol for fees", () => {
   const out = formatTransactionPlan(monadPlan);
-  assert.match(out, /MON/);
+  assert.match(out, /ETH/);
+  assert.doesNotMatch(out, /MON/);
   assert.doesNotMatch(out, /CFX/);
 });
