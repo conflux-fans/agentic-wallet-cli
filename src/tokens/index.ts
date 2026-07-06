@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { isAddress, type Address } from "viem";
 import type { ChainKey } from "../chains/index.js";
+import { CHAIN_DEFINITIONS } from "../chains/definitions.js";
 
 export type TokenSymbol = string;
 
@@ -14,49 +15,26 @@ export type TokenConfig = {
 
 export type TokenRegistry = Record<ChainKey, Record<string, TokenConfig>>;
 
-export type TokenRegistryInput = {
-  confluxUsdtAddress?: Address;
-  confluxUsdcAddress?: Address;
-  monadUsdtAddress?: Address;
-  monadUsdcAddress?: Address;
-};
-
-const DEFAULT_CONFLUX_USDT_ADDRESS = "0xaf37e8b6c9ed7f6318979f56fc287d76c30847ff";
-const DEFAULT_CONFLUX_USDC_ADDRESS = "0x6963efed0ab40f6c3d7bda44a05dcf1437c44372";
-const DEFAULT_MONAD_USDT_ADDRESS = "0xe7cd86e13AC4309349F30B3435a9d337750fC82D";
-const DEFAULT_MONAD_USDC_ADDRESS = "0x754704Bc059F8C67012fEd69BC8A327a5aafb603";
-
 type TokenListFile = {
   chains?: Partial<Record<ChainKey, { tokens?: Record<string, TokenConfig>; removedSymbols?: string[] }>>;
 };
 
-export function createTokenRegistry(input: TokenRegistryInput): TokenRegistry {
-  const registry: TokenRegistry = {
-    conflux: {
-      USDT: createToken(
-        "USDT",
-        "Tether USD",
-        input.confluxUsdtAddress ?? DEFAULT_CONFLUX_USDT_ADDRESS
-      ),
-      USDC: createToken(
-        "USDC",
-        "USD Coin",
-        input.confluxUsdcAddress ?? DEFAULT_CONFLUX_USDC_ADDRESS
-      )
-    },
-    monad: {
-      USDT: createToken(
-        "USDT",
-        "Tether USD",
-        input.monadUsdtAddress ?? DEFAULT_MONAD_USDT_ADDRESS
-      ),
-      USDC: createToken(
-        "USDC",
-        "USD Coin",
-        input.monadUsdcAddress ?? DEFAULT_MONAD_USDC_ADDRESS
-      )
+export function createTokenRegistry(
+  overrides: Record<string, Record<string, `0x${string}`>>
+): TokenRegistry {
+  const registry: TokenRegistry = {};
+  for (const def of CHAIN_DEFINITIONS) {
+    const chainTokens: Record<string, TokenConfig> = {};
+    for (const [symbol, token] of Object.entries(def.defaultTokens ?? {})) {
+      chainTokens[symbol] = {
+        symbol,
+        name: token.name,
+        decimals: token.decimals,
+        address: overrides[def.key]?.[symbol] ?? token.address
+      };
     }
-  };
+    registry[def.key] = chainTokens;
+  }
 
   const file = loadTokenListFile();
   for (const chain of Object.keys(registry) as ChainKey[]) {
@@ -162,19 +140,6 @@ export function removeWhitelistedToken(
   saveTokenListFile(file);
   delete registry[chain][normalizedSymbol];
   return existing;
-}
-
-function createToken(
-  symbol: TokenSymbol,
-  name: string,
-  address?: Address
-): TokenConfig {
-  return {
-    symbol,
-    name,
-    decimals: 6,
-    address
-  };
 }
 
 function normalizeSymbol(symbol: string): string {
