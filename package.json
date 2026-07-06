@@ -11,6 +11,7 @@
     "build": "tsc",
     "start": "node dist/cli/index.js",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "eval:nl": "tsx scripts/run-nl-intent-eval.ts"
   },
   "dependencies": {
