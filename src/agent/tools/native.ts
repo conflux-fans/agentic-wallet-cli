@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AddressBook } from "../../address-book/index.js";
 import type { AgentSession } from "../session.js";
 import type { ChainKey } from "../../chains/index.js";
+import { chainEnumSchema } from "../../chains/index.js";
 import {
   getAccountInfo,
   getNativeBalance,
@@ -12,12 +13,6 @@ import {
   type NativeTransferPlan,
   type WalletContext
 } from "../../wallet/client.js";
-
-const chainSchema = z.enum(["conflux", "monad"]);
-
-function toChainKey(chain: z.infer<typeof chainSchema>): ChainKey {
-  return chain;
-}
 
 function serializeNativeTransferPlan(plan: NativeTransferPlan) {
   return {
@@ -40,6 +35,7 @@ export function createNativeTools(
   session: AgentSession,
   addressBook?: AddressBook
 ) {
+  const chainSchema = chainEnumSchema(Object.keys(ctx.chains));
   return {
     getAccountInfo: tool({
       description:
@@ -60,7 +56,7 @@ export function createNativeTools(
           throw new Error("查询地址不是合法 EVM 地址");
         }
 
-        return getAccountInfo(ctx, toChainKey(chain), address);
+        return getAccountInfo(ctx, chain, address);
       }
     }),
     getNativeBalance: tool({
@@ -82,7 +78,7 @@ export function createNativeTools(
           throw new Error("查询地址不是合法 EVM 地址");
         }
 
-        return getNativeBalance(ctx, toChainKey(chain), address);
+        return getNativeBalance(ctx, chain, address);
       }
     }),
     prepareNativeTransfer: tool({
@@ -105,7 +101,7 @@ export function createNativeTools(
 
         const plan = await prepareNativeTransfer(ctx, {
           id: randomUUID(),
-          chain: toChainKey(chain),
+          chain: chain,
           to: resolvedTo,
           amount
         });

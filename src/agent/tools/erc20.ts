@@ -4,6 +4,7 @@ import { isAddress, type Address } from "viem";
 import { z } from "zod";
 import type { AddressBook } from "../../address-book/index.js";
 import type { ChainKey } from "../../chains/index.js";
+import { chainEnumSchema } from "../../chains/index.js";
 import {
   getErc20Allowance,
   getErc20Balance,
@@ -21,12 +22,7 @@ import {
 } from "../../tokens/index.js";
 import type { AgentSession } from "../session.js";
 
-const chainSchema = z.enum(["conflux", "monad"]);
 const tokenSymbolSchema = z.string().optional();
-
-function toChainKey(chain: z.infer<typeof chainSchema>): ChainKey {
-  return chain;
-}
 
 function resolveToken(
   registry: TokenRegistry,
@@ -100,6 +96,7 @@ export function createErc20Tools(
   session: AgentSession,
   addressBook?: AddressBook
 ) {
+  const chainSchema = chainEnumSchema(Object.keys(ctx.chains));
   return {
     getErc20Balance: tool({
       description:
@@ -111,7 +108,7 @@ export function createErc20Tools(
         address: z.string().optional().describe("要查询余额的 EVM 地址，默认当前钱包")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, address }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         ctx.logger.log("agent tool call", {
           tool: "getErc20Balance",
           input: { chain, tokenSymbol, tokenAddress, address: address ?? ctx.account.address }
@@ -139,7 +136,7 @@ export function createErc20Tools(
         spender: z.string().describe("被授权 spender 地址或地址簿联系人名称")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, owner, spender }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         const resolvedOwner = owner !== undefined ? addressBook?.resolve(owner) ?? owner : undefined;
         const resolvedSpender = addressBook?.resolve(spender) ?? spender;
         ctx.logger.log("agent tool call", {
@@ -180,7 +177,7 @@ export function createErc20Tools(
         amount: z.string().describe("转账数量，十进制字符串，例如 10.5")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, to, amount }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         const resolvedTo = addressBook?.resolve(to) ?? to;
         ctx.logger.log("agent tool call", {
           tool: "prepareErc20Transfer",
@@ -212,7 +209,7 @@ export function createErc20Tools(
         amount: z.string().describe("授权数量，十进制字符串，例如 10.5")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, spender, amount }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         const resolvedSpender = addressBook?.resolve(spender) ?? spender;
         ctx.logger.log("agent tool call", {
           tool: "prepareErc20Approve",

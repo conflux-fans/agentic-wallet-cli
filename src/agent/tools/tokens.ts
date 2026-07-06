@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { ChainKey } from "../../chains/index.js";
 import type { ChainConfig } from "../../chains/index.js";
+import { chainEnumSchema } from "../../chains/index.js";
 import {
   addWhitelistedToken,
   getWhitelistedTokens,
@@ -13,17 +14,12 @@ import { readErc20Metadata } from "../../tokens/metadata.js";
 import type { Logger } from "../../logger.js";
 import { isAddress } from "viem";
 
-const chainSchema = z.enum(["conflux", "monad"]);
-
-function toChainKey(chain: z.infer<typeof chainSchema>): ChainKey {
-  return chain;
-}
-
 export function createTokenTools(
   registry: TokenRegistry,
   chains: Record<ChainKey, ChainConfig>,
   logger: Logger
 ) {
+  const chainSchema = chainEnumSchema(Object.keys(chains));
   return {
     getWhitelistedTokens: tool({
       description:
@@ -37,7 +33,7 @@ export function createTokenTools(
           input: { chain }
         });
 
-        return getWhitelistedTokens(registry, toChainKey(chain));
+        return getWhitelistedTokens(registry, chain);
       }
     }),
     addWhitelistedToken: tool({
@@ -58,7 +54,7 @@ export function createTokenTools(
         if (!isAddress(address)) {
           throw new Error("token 地址不是合法 EVM 地址");
         }
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         const metadata = await readErc20Metadata(chains[chainKey], address, logger);
 
         return addWhitelistedToken(registry, chainKey, {
@@ -85,7 +81,7 @@ export function createTokenTools(
           input: { chain, symbol, address, decimals, name }
         });
 
-        return updateWhitelistedToken(registry, toChainKey(chain), symbol, {
+        return updateWhitelistedToken(registry, chain, symbol, {
           address,
           decimals,
           name
@@ -104,7 +100,7 @@ export function createTokenTools(
           input: { chain, symbol }
         });
 
-        return removeWhitelistedToken(registry, toChainKey(chain), symbol);
+        return removeWhitelistedToken(registry, chain, symbol);
       }
     })
   };

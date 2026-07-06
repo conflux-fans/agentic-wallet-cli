@@ -2,6 +2,7 @@ import { isAddress, type Address } from "viem";
 import { tool } from "ai";
 import { z } from "zod";
 import type { ChainKey } from "../../chains/index.js";
+import { chainEnumSchema } from "../../chains/index.js";
 import {
   getErc20TransferHistory,
   getNativeTransferHistory,
@@ -13,12 +14,6 @@ import {
   type TokenRegistry
 } from "../../tokens/index.js";
 import type { WalletContext } from "../../wallet/client.js";
-
-const chainSchema = z.enum(["conflux", "monad"]);
-
-function toChainKey(chain: z.infer<typeof chainSchema>): ChainKey {
-  return chain;
-}
 
 function parseOptionalBlock(value: string | undefined): bigint | undefined {
   return value === undefined ? undefined : BigInt(value);
@@ -57,6 +52,7 @@ export function createHistoryTools(
   registry: TokenRegistry,
   scanApis: ScanApiConfig
 ) {
+  const chainSchema = chainEnumSchema(Object.keys(wallet.chains));
   return {
     getNativeTransferHistory: tool({
       description:
@@ -69,7 +65,7 @@ export function createHistoryTools(
         limit: z.number().int().min(1).max(100).optional().describe("最多返回多少条，默认 20")
       }),
       execute: async ({ chain, address, startBlock, endBlock, limit }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         if (address !== undefined && !isAddress(address)) {
           throw new Error("address 不是合法 EVM 地址");
         }
@@ -100,7 +96,7 @@ export function createHistoryTools(
         limit: z.number().int().min(1).max(100).optional().describe("最多返回多少条，默认 20")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, address, fromBlock, toBlock, blockRange, limit }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         if (address !== undefined && !isAddress(address)) {
           throw new Error("address 不是合法 EVM 地址");
         }
