@@ -81,6 +81,7 @@ export type NativeTransferPlan = {
   kind: "native-transfer";
   chain: ChainKey;
   chainName: string;
+  nativeSymbol: string;
   from: Address;
   to: Address;
   amount: string;
@@ -95,6 +96,7 @@ export type Erc20TransferPlan = {
   kind: "erc20-transfer";
   chain: ChainKey;
   chainName: string;
+  nativeSymbol: string;
   from: Address;
   tokenAddress: Address;
   tokenSymbol: string;
@@ -111,6 +113,7 @@ export type Erc20ApprovePlan = {
   kind: "erc20-approve";
   chain: ChainKey;
   chainName: string;
+  nativeSymbol: string;
   owner: Address;
   tokenAddress: Address;
   tokenSymbol: string;
@@ -127,6 +130,7 @@ export type ContractCallPlan = {
   kind: "contract-call";
   chain: ChainKey;
   chainName: string;
+  nativeSymbol: string;
   protocol: string;
   action: string;
   from: Address;
@@ -322,6 +326,7 @@ export async function prepareNativeTransfer(
     kind: "native-transfer",
     chain: input.chain,
     chainName: config.displayName,
+    nativeSymbol: config.nativeSymbol,
     from: ctx.account.address,
     to: input.to,
     amount: input.amount,
@@ -453,6 +458,7 @@ export async function prepareErc20Transfer(
     kind: "erc20-transfer",
     chain: input.chain,
     chainName: config.displayName,
+    nativeSymbol: config.nativeSymbol,
     from: ctx.account.address,
     tokenAddress: input.token.address,
     tokenSymbol: metadata.symbol,
@@ -511,6 +517,7 @@ export async function prepareErc20Approve(
     kind: "erc20-approve",
     chain: input.chain,
     chainName: config.displayName,
+    nativeSymbol: config.nativeSymbol,
     owner: ctx.account.address,
     tokenAddress: input.token.address,
     tokenSymbol: metadata.symbol,
@@ -568,6 +575,7 @@ export async function prepareContractCall(
     kind: "contract-call",
     chain: input.chain,
     chainName: config.displayName,
+    nativeSymbol: config.nativeSymbol,
     protocol: input.protocol,
     action: input.action,
     from: ctx.account.address,

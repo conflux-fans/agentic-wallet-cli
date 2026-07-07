@@ -1,69 +1,71 @@
+import { z } from "zod";
 import type { Chain } from "viem";
+import { CHAIN_DEFINITIONS } from "./definitions.js";
 
-export type ChainKey = "conflux" | "monad";
+export type ChainKey = string;
 
 export type ChainConfig = {
-  key: ChainKey;
+  key: string;
   displayName: string;
+  nativeSymbol: string;
   chain: Chain;
   rpcUrl: string;
   explorerUrl?: string;
 };
 
-type ChainInput = {
-  confluxRpcUrl: string;
-  monadRpcUrl: string;
+export type ChainEnvConfig = {
+  rpcUrl: string;
+  tokens: Record<string, `0x${string}`>;
+  scan: { apiUrl?: string; apiKey?: string };
 };
 
-export function createChainRegistry(input: ChainInput): Record<ChainKey, ChainConfig> {
-  return {
-    conflux: {
-      key: "conflux",
-      displayName: "Conflux eSpace",
-      rpcUrl: input.confluxRpcUrl,
-      explorerUrl: "https://evm.confluxscan.io",
-      chain: {
-        id: 1030,
-        name: "Conflux eSpace",
-        nativeCurrency: {
-          name: "CFX",
-          symbol: "CFX",
-          decimals: 18
-        },
-        rpcUrls: {
-          default: { http: [input.confluxRpcUrl] }
-        },
-        blockExplorers: {
-          default: {
-            name: "ConfluxScan",
-            url: "https://evm.confluxscan.io"
-          }
-        }
-      }
-    },
-    monad: {
-      key: "monad",
-      displayName: "Monad",
-      rpcUrl: input.monadRpcUrl,
-      chain: {
-        id: 10143,
-        name: "Monad",
-        nativeCurrency: {
-          name: "MON",
-          symbol: "MON",
-          decimals: 18
-        },
-        rpcUrls: {
-          default: { http: [input.monadRpcUrl] }
-        }
-      }
-    }
-  };
+export function chainKeys(): string[] {
+  return CHAIN_DEFINITIONS.map((d) => d.key);
 }
 
-export function parseChainKey(value: string): ChainKey {
-  if (value === "conflux" || value === "monad") {
-    return value;
+export function createChainRegistry(rpcUrls: Record<string, string>): Record<string, ChainConfig> {
+  const registry: Record<string, ChainConfig> = {};
+  for (const def of CHAIN_DEFINITIONS) {
+    const rpcUrl = rpcUrls[def.key];
+    if (!rpcUrl) {
+      throw new Error(`Missing RPC URL for chain "${def.key}"`);
+    }
+    const chain: Chain = {
+      id: def.chainId,
+      name: def.displayName,
+      nativeCurrency: def.nativeCurrency,
+      rpcUrls: { default: { http: [rpcUrl] } },
+      ...(def.explorerUrl
+        ? {
+            blockExplorers: {
+              default: { name: def.blockExplorerName ?? "Explorer", url: def.explorerUrl }
+            }
+          }
+        : {})
+    };
+    registry[def.key] = {
+      key: def.key,
+      displayName: def.displayName,
+      nativeSymbol: def.nativeCurrency.symbol,
+      rpcUrl,
+      explorerUrl: def.explorerUrl,
+      chain
+    };
   }
-  throw new Error(`Unsupported chain "${value}". Use "conflux" or "monad".`);
+  return registry;
+}
+
+export function isChainKey(registry: Record<string, ChainConfig>, value: string): boolean {
+  return Object.prototype.hasOwnProperty.call(registry, value);
+}
+
+export function assertChainKey(registry: Record<string, ChainConfig>, value: string): string {
+  if (!isChainKey(registry, value)) {
+    throw new Error(`Unsupported chain "${value}". Available: ${Object.keys(registry).join(", ")}`);
+  }
+  return value;
+}
+
+export function chainEnumSchema(keys: string[]) {
+  return z.enum(keys as [string, ...string[]]);
 }

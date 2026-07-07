@@ -4,6 +4,7 @@ import { isAddress, type Address } from "viem";
 import { z } from "zod";
 import type { AddressBook } from "../../address-book/index.js";
 import type { ChainKey } from "../../chains/index.js";
+import { chainEnumSchema } from "../../chains/index.js";
 import {
   getErc20Allowance,
   getErc20Balance,
@@ -21,12 +22,7 @@ import {
 } from "../../tokens/index.js";
 import type { AgentSession } from "../session.js";
 
-const chainSchema = z.enum(["conflux", "monad"]);
 const tokenSymbolSchema = z.string().optional();
-
-function toChainKey(chain: z.infer<typeof chainSchema>): ChainKey {
-  return chain;
-}
 
 function resolveToken(
   registry: TokenRegistry,
@@ -100,18 +96,21 @@ export function createErc20Tools(
   session: AgentSession,
   addressBook?: AddressBook
 ) {
+  const chainKeys = Object.keys(ctx.chains);
+  const chainSchema = chainEnumSchema(chainKeys);
+  const chainDesc = `链标识，可选值：${chainKeys.join("、")}`;
   return {
     getErc20Balance: tool({
       description:
         "查询 ERC20 token 余额。可使用白名单 tokenSymbol(USDT/USDC)，也可直接指定 tokenAddress。address 可选，默认当前钱包地址。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: tokenSymbolSchema.describe("token symbol，例如 USDT、USDC 或自定义 token symbol"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         address: z.string().optional().describe("要查询余额的 EVM 地址，默认当前钱包")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, address }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         ctx.logger.log("agent tool call", {
           tool: "getErc20Balance",
           input: { chain, tokenSymbol, tokenAddress, address: address ?? ctx.account.address }
@@ -132,14 +131,14 @@ export function createErc20Tools(
       description:
         "查询 ERC20 allowance/approve 授权额度。owner 可选，默认当前钱包地址；spender 必填。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: tokenSymbolSchema.describe("token symbol，例如 USDT、USDC 或自定义 token symbol"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         owner: z.string().optional().describe("授权方地址，默认当前钱包"),
         spender: z.string().describe("被授权 spender 地址或地址簿联系人名称")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, owner, spender }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         const resolvedOwner = owner !== undefined ? addressBook?.resolve(owner) ?? owner : undefined;
         const resolvedSpender = addressBook?.resolve(spender) ?? spender;
         ctx.logger.log("agent tool call", {
@@ -173,14 +172,14 @@ export function createErc20Tools(
       description:
         "准备 ERC20 token 转账交易。只生成待确认交易计划，不会签名或发送。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: tokenSymbolSchema.describe("token symbol，例如 USDT、USDC 或自定义 token symbol"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         to: z.string().describe("接收方 EVM 地址或地址簿联系人名称"),
         amount: z.string().describe("转账数量，十进制字符串，例如 10.5")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, to, amount }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         const resolvedTo = addressBook?.resolve(to) ?? to;
         ctx.logger.log("agent tool call", {
           tool: "prepareErc20Transfer",
@@ -205,14 +204,14 @@ export function createErc20Tools(
       description:
         "准备 ERC20 approve 授权交易。只生成待确认交易计划，不会签名或发送。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: tokenSymbolSchema.describe("token symbol，例如 USDT、USDC 或自定义 token symbol"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         spender: z.string().describe("被授权 spender 地址或地址簿联系人名称"),
         amount: z.string().describe("授权数量，十进制字符串，例如 10.5")
       }),
       execute: async ({ chain, tokenSymbol, tokenAddress, spender, amount }) => {
-        const chainKey = toChainKey(chain);
+        const chainKey = chain;
         const resolvedSpender = addressBook?.resolve(spender) ?? spender;
         ctx.logger.log("agent tool call", {
           tool: "prepareErc20Approve",

@@ -4,7 +4,7 @@ import { createPublicClient, http, type Address, type Hex } from "viem";
 import type { ToolSet } from "ai";
 import { z } from "zod";
 import type { AddressBook } from "../address-book/index.js";
-import type { ChainConfig, ChainKey } from "../chains/index.js";
+import { chainEnumSchema, type ChainConfig, type ChainKey } from "../chains/index.js";
 import type { AgentSession } from "../agent/session.js";
 import type { TransactionFlow } from "../agent/session.js";
 import type { Logger } from "../logger.js";
@@ -46,7 +46,7 @@ export type SkillContext = {
   session: AgentSession;
   logger: Logger;
   schemas: {
-    chain: z.ZodEnum<{ conflux: "conflux"; monad: "monad" }>;
+    chain: ReturnType<typeof chainEnumSchema>;
   };
   rpc: {
     publicClient: (chain: ChainKey) => ReturnType<typeof createPublicClient>;
@@ -108,7 +108,7 @@ export function createSkillContext(input: {
     session: input.session,
     logger: input.wallet.logger,
     schemas: {
-      chain: z.enum(["conflux", "monad"])
+      chain: chainEnumSchema(Object.keys(input.chains))
     },
     rpc: {
       publicClient(chain) {

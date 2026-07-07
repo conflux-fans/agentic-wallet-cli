@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AddressBook } from "../../address-book/index.js";
 import type { AgentSession } from "../session.js";
 import type { ChainKey } from "../../chains/index.js";
+import { chainEnumSchema } from "../../chains/index.js";
 import {
   getAccountInfo,
   getNativeBalance,
@@ -12,12 +13,6 @@ import {
   type NativeTransferPlan,
   type WalletContext
 } from "../../wallet/client.js";
-
-const chainSchema = z.enum(["conflux", "monad"]);
-
-function toChainKey(chain: z.infer<typeof chainSchema>): ChainKey {
-  return chain;
-}
 
 function serializeNativeTransferPlan(plan: NativeTransferPlan) {
   return {
@@ -40,12 +35,15 @@ export function createNativeTools(
   session: AgentSession,
   addressBook?: AddressBook
 ) {
+  const chainKeys = Object.keys(ctx.chains);
+  const chainSchema = chainEnumSchema(chainKeys);
+  const chainDesc = `链标识，可选值：${chainKeys.join("、")}`;
   return {
     getAccountInfo: tool({
       description:
         "查询指定链上的账户信息，包括地址、native 余额和 nonce。address 可选；如果用户没有指定地址，则查询当前钱包账户。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         address: z
           .string()
           .optional()
@@ -60,14 +58,14 @@ export function createNativeTools(
           throw new Error("查询地址不是合法 EVM 地址");
         }
 
-        return getAccountInfo(ctx, toChainKey(chain), address);
+        return getAccountInfo(ctx, chain, address);
       }
     }),
     getNativeBalance: tool({
       description:
         "查询指定链上的 native 资产余额。address 可选；如果用户没有指定地址，则查询当前钱包账户。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         address: z
           .string()
           .optional()
@@ -82,14 +80,14 @@ export function createNativeTools(
           throw new Error("查询地址不是合法 EVM 地址");
         }
 
-        return getNativeBalance(ctx, toChainKey(chain), address);
+        return getNativeBalance(ctx, chain, address);
       }
     }),
     prepareNativeTransfer: tool({
       description:
         "准备 native 资产转账交易。这个工具只生成待确认交易计划，不会签名或发送交易。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         to: z.string().describe("接收方 EVM 地址或地址簿联系人名称"),
         amount: z.string().describe("转账数量，十进制字符串，例如 0.1")
       }),
@@ -105,7 +103,7 @@ export function createNativeTools(
 
         const plan = await prepareNativeTransfer(ctx, {
           id: randomUUID(),
-          chain: toChainKey(chain),
+          chain: chain,
           to: resolvedTo,
           amount
         });
