@@ -6,6 +6,7 @@ export type TokenDefinition = {
 
 export type ChainDefinition = {
   key: string;
+  envPrefix?: string;
   displayName: string;
   chainId: number;
   nativeCurrency: { name: string; symbol: string; decimals: number };

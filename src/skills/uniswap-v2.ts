@@ -10,7 +10,7 @@ import {
 import { tool } from "ai";
 import { z } from "zod";
 import { defineSkill, type SkillContext } from "./sdk.js";
-import { chainEnumSchema, type ChainKey } from "../chains/index.js";
+import { chainEnumSchema, getChainConfig, type ChainKey } from "../chains/index.js";
 
 type UniswapV2Config = Partial<
   Record<ChainKey, { router: Address; factory: Address; wrappedNative: Address }>
@@ -261,19 +261,30 @@ const erc20AllowanceAbi = [
 
 export function createUniswapV2Skill(ctx: SkillContext) {
   const config = ctx.config.readJson<UniswapV2Config>("config.json");
-  const chainSchema = chainEnumSchema(Object.keys(config));
+  const supportedChainKeys = Object.keys(config).filter((chain) => chain in ctx.chains);
+  if (supportedChainKeys.length === 0) {
+    return defineSkill({
+      name: "uniswap-v2",
+      description: "Uniswap V2 skill: no configured chain is available in the active chain registry.",
+      tools: {}
+    });
+  }
+  const chainSchema = chainEnumSchema(supportedChainKeys);
+  const supportedChainsText = supportedChainKeys
+    .map((chain) => getChainConfig(ctx.chains, chain).displayName)
+    .join("、");
   const tokenInputSchema = z.object({
-    symbol: z.string().optional().describe("token symbol，例如 USDT 或 CFX"),
+    symbol: z.string().optional().describe("token symbol，例如 USDT 或 native symbol"),
     address: z.string().optional().describe("token 地址")
   });
 
   return defineSkill({
     name: "uniswap-v2",
     description:
-      "Uniswap V2 skill: supports Conflux pool info, exact-in/exact-out quote, multi-hop route selection, swap preparation, and LP liquidity tools for ERC20 and CFX via wrapped native.",
+      `Uniswap V2 skill: supports configured chains (${supportedChainsText}) for pool info, exact-in/exact-out quote, multi-hop route selection, swap preparation, and LP liquidity tools for ERC20 and native assets via wrapped native.`,
     tools: {
       getUniswapV2PoolInfo: tool({
-        description: "查询 Conflux 上 Uniswap V2 pair 地址、token0/token1、reserves 和 spot price。",
+        description: `查询已配置链(${supportedChainsText})上的 Uniswap V2 pair 地址、token0/token1、reserves 和 spot price。`,
         inputSchema: z.object({
           chain: chainSchema,
           tokenA: tokenInputSchema,
@@ -330,7 +341,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
       }),
       getUniswapV2Quote: tool({
         description:
-          "查询 Conflux 上 Uniswap V2 swap 报价，支持 exactIn/exactOut、直连和多跳路径、CFX 与 ERC20 互换。",
+          `查询已配置链(${supportedChainsText})上的 Uniswap V2 swap 报价，支持 exactIn/exactOut、直连和多跳路径、native 与 ERC20 互换。`,
         inputSchema: z.object({
           chain: chainSchema,
           tokenIn: tokenInputSchema,
@@ -372,7 +383,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
       }),
       prepareUniswapV2Swap: tool({
         description:
-          "准备 Conflux 上 Uniswap V2 swap 交易，支持 exactIn/exactOut、直连和多跳路径、CFX 与 ERC20 互换。不会签名或发送；ERC20 输入 token allowance 不足时会自动生成 approve + swap 多步操作。",
+          `准备已配置链(${supportedChainsText})上的 Uniswap V2 swap 交易，支持 exactIn/exactOut、直连和多跳路径、native 与 ERC20 互换。不会签名或发送；ERC20 输入 token allowance 不足时会自动生成 approve + swap 多步操作。`,
         inputSchema: z.object({
           chain: chainSchema,
           tokenIn: tokenInputSchema,
@@ -468,7 +479,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
         }
       }),
       getUniswapV2LiquidityPosition: tool({
-        description: "查询 Conflux 上 Uniswap V2 LP position，包括 pair、LP 余额、总供应、份额和对应底层资产数量。",
+        description: `查询已配置链(${supportedChainsText})上的 Uniswap V2 LP position，包括 pair、LP 余额、总供应、份额和对应底层资产数量。`,
         inputSchema: z.object({
           chain: chainSchema,
           tokenA: tokenInputSchema,
@@ -506,7 +517,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
       }),
       prepareUniswapV2AddLiquidity: tool({
         description:
-          "准备 Conflux 上 Uniswap V2 添加流动性交易，支持 ERC20/ERC20 和 CFX/ERC20。不会签名或发送；ERC20 allowance 不足时会自动生成 approve + add liquidity 多步操作。",
+          `准备已配置链(${supportedChainsText})上的 Uniswap V2 添加流动性交易，支持 ERC20/ERC20 和 native/ERC20。不会签名或发送；ERC20 allowance 不足时会自动生成 approve + add liquidity 多步操作。`,
         inputSchema: z.object({
           chain: chainSchema,
           tokenA: tokenInputSchema,
@@ -595,7 +606,7 @@ export function createUniswapV2Skill(ctx: SkillContext) {
       }),
       prepareUniswapV2RemoveLiquidity: tool({
         description:
-          "准备 Conflux 上 Uniswap V2 移除流动性交易，支持 ERC20/ERC20 和 CFX/ERC20。不会签名或发送；LP token allowance 不足时会自动生成 approve LP + remove liquidity 多步操作。",
+          `准备已配置链(${supportedChainsText})上的 Uniswap V2 移除流动性交易，支持 ERC20/ERC20 和 native/ERC20。不会签名或发送；LP token allowance 不足时会自动生成 approve LP + remove liquidity 多步操作。`,
         inputSchema: z.object({
           chain: chainSchema,
           tokenA: tokenInputSchema,
@@ -719,11 +730,12 @@ function resolveSwapToken(
   config: { wrappedNative: Address },
   input: { symbol?: string; address?: string }
 ): SwapToken {
-  if (input.symbol?.toUpperCase() === ctx.chains[chain].chain.nativeCurrency.symbol.toUpperCase()) {
+  const chainConfig = getChainConfig(ctx.chains, chain);
+  if (input.symbol?.toUpperCase() === chainConfig.nativeSymbol.toUpperCase()) {
     return {
       address: config.wrappedNative,
-      symbol: ctx.chains[chain].chain.nativeCurrency.symbol,
-      decimals: ctx.chains[chain].chain.nativeCurrency.decimals,
+      symbol: chainConfig.nativeSymbol,
+      decimals: chainConfig.nativeDecimals,
       isNative: true
     };
   }
@@ -1116,10 +1128,11 @@ function getBaseRouteTokens(
   tokenIn: SwapToken,
   tokenOut: SwapToken
 ): SwapToken[] {
+  const chainConfig = getChainConfig(ctx.chains, chain);
   const native = {
     address: config.wrappedNative,
-    symbol: ctx.chains[chain].chain.nativeCurrency.symbol,
-    decimals: ctx.chains[chain].chain.nativeCurrency.decimals,
+    symbol: chainConfig.nativeSymbol,
+    decimals: chainConfig.nativeDecimals,
     isNative: false
   };
   const tokens = [native, resolveOptionalBaseToken(ctx, chain, "USDT"), resolveOptionalBaseToken(ctx, chain, "USDC")];

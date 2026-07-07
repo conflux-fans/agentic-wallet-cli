@@ -3,17 +3,15 @@ import {
   encodeFunctionData,
   createPublicClient,
   createWalletClient,
-  formatEther,
   formatUnits,
   http,
-  parseEther,
   parseUnits,
   type Address,
   type Chain,
   type Hex
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import type { ChainConfig, ChainKey } from "../chains/index.js";
+import { getChainConfig, type ChainConfig, type ChainKey } from "../chains/index.js";
 import { createLogger, redactUrl, type Logger } from "../logger.js";
 
 export type WalletContext = {
@@ -82,6 +80,7 @@ export type NativeTransferPlan = {
   chain: ChainKey;
   chainName: string;
   nativeSymbol: string;
+  nativeDecimals: number;
   from: Address;
   to: Address;
   amount: string;
@@ -97,6 +96,7 @@ export type Erc20TransferPlan = {
   chain: ChainKey;
   chainName: string;
   nativeSymbol: string;
+  nativeDecimals: number;
   from: Address;
   tokenAddress: Address;
   tokenSymbol: string;
@@ -114,6 +114,7 @@ export type Erc20ApprovePlan = {
   chain: ChainKey;
   chainName: string;
   nativeSymbol: string;
+  nativeDecimals: number;
   owner: Address;
   tokenAddress: Address;
   tokenSymbol: string;
@@ -131,6 +132,7 @@ export type ContractCallPlan = {
   chain: ChainKey;
   chainName: string;
   nativeSymbol: string;
+  nativeDecimals: number;
   protocol: string;
   action: string;
   from: Address;
@@ -219,8 +221,8 @@ export function getWalletClient(config: ChainConfig, account: WalletContext["acc
   });
 }
 
-export function formatNativeAmount(value: bigint): string {
-  return truncateDecimalString(formatEther(value));
+export function formatNativeAmount(value: bigint, decimals = 18): string {
+  return truncateDecimalString(formatUnits(value, decimals));
 }
 
 export function formatTokenAmount(value: bigint, decimals: number): string {
@@ -242,7 +244,7 @@ export async function getAccountInfo(
   chainKey: ChainKey,
   address: Address = ctx.account.address
 ) {
-  const config = ctx.chains[chainKey];
+  const config = getChainConfig(ctx.chains, chainKey);
   const publicClient = getPublicClient(config);
   ctx.logger.log("web3 rpc batch", {
     chain: config.displayName,
@@ -259,7 +261,7 @@ export async function getAccountInfo(
     address,
     chain: chainKey,
     chainName: config.displayName,
-    balance: formatNativeAmount(balance),
+    balance: formatNativeAmount(balance, config.nativeDecimals),
     symbol: config.chain.nativeCurrency.symbol,
     nonce
   };
@@ -270,7 +272,7 @@ export async function getNativeBalance(
   chainKey: ChainKey,
   address: Address = ctx.account.address
 ) {
-  const config = ctx.chains[chainKey];
+  const config = getChainConfig(ctx.chains, chainKey);
   const publicClient = getPublicClient(config);
   ctx.logger.log("web3 rpc call", {
     chain: config.displayName,
@@ -284,7 +286,7 @@ export async function getNativeBalance(
     address,
     chain: chainKey,
     chainName: config.displayName,
-    balance: formatNativeAmount(balance),
+    balance: formatNativeAmount(balance, config.nativeDecimals),
     symbol: config.chain.nativeCurrency.symbol
   };
 }
@@ -298,9 +300,9 @@ export async function prepareNativeTransfer(
     amount: string;
   }
 ): Promise<NativeTransferPlan> {
-  const config = ctx.chains[input.chain];
+  const config = getChainConfig(ctx.chains, input.chain);
   const publicClient = getPublicClient(config);
-  const value = parseEther(input.amount);
+  const value = parseUnits(input.amount, config.nativeDecimals);
   ctx.logger.log("web3 rpc call", {
     chain: config.displayName,
     endpoint: redactUrl(config.rpcUrl),
@@ -327,6 +329,7 @@ export async function prepareNativeTransfer(
     chain: input.chain,
     chainName: config.displayName,
     nativeSymbol: config.nativeSymbol,
+    nativeDecimals: config.nativeDecimals,
     from: ctx.account.address,
     to: input.to,
     amount: input.amount,
@@ -343,7 +346,7 @@ export async function getErc20Balance(
   token: Erc20TokenInput,
   address: Address = ctx.account.address
 ) {
-  const config = ctx.chains[chainKey];
+  const config = getChainConfig(ctx.chains, chainKey);
   const publicClient = getPublicClient(config);
   const metadata = await resolveErc20Metadata(ctx, chainKey, token);
   ctx.logger.log("web3 rpc call", {
@@ -380,7 +383,7 @@ export async function getErc20Allowance(
   owner: Address = ctx.account.address,
   spender: Address
 ) {
-  const config = ctx.chains[chainKey];
+  const config = getChainConfig(ctx.chains, chainKey);
   const publicClient = getPublicClient(config);
   const metadata = await resolveErc20Metadata(ctx, chainKey, token);
   ctx.logger.log("web3 rpc call", {
@@ -422,7 +425,7 @@ export async function prepareErc20Transfer(
     amount: string;
   }
 ): Promise<Erc20TransferPlan> {
-  const config = ctx.chains[input.chain];
+  const config = getChainConfig(ctx.chains, input.chain);
   const publicClient = getPublicClient(config);
   const metadata = await resolveErc20Metadata(ctx, input.chain, input.token);
   const rawAmount = parseUnits(input.amount, metadata.decimals);
@@ -459,6 +462,7 @@ export async function prepareErc20Transfer(
     chain: input.chain,
     chainName: config.displayName,
     nativeSymbol: config.nativeSymbol,
+    nativeDecimals: config.nativeDecimals,
     from: ctx.account.address,
     tokenAddress: input.token.address,
     tokenSymbol: metadata.symbol,
@@ -481,7 +485,7 @@ export async function prepareErc20Approve(
     amount: string;
   }
 ): Promise<Erc20ApprovePlan> {
-  const config = ctx.chains[input.chain];
+  const config = getChainConfig(ctx.chains, input.chain);
   const publicClient = getPublicClient(config);
   const metadata = await resolveErc20Metadata(ctx, input.chain, input.token);
   const rawAmount = parseUnits(input.amount, metadata.decimals);
@@ -518,6 +522,7 @@ export async function prepareErc20Approve(
     chain: input.chain,
     chainName: config.displayName,
     nativeSymbol: config.nativeSymbol,
+    nativeDecimals: config.nativeDecimals,
     owner: ctx.account.address,
     tokenAddress: input.token.address,
     tokenSymbol: metadata.symbol,
@@ -544,7 +549,7 @@ export async function prepareContractCall(
     metadata?: ContractCallMetadata;
   }
 ): Promise<ContractCallPlan> {
-  const config = ctx.chains[input.chain];
+  const config = getChainConfig(ctx.chains, input.chain);
   const publicClient = getPublicClient(config);
   const value = input.value ?? 0n;
   ctx.logger.log("web3 rpc call", {
@@ -576,6 +581,7 @@ export async function prepareContractCall(
     chain: input.chain,
     chainName: config.displayName,
     nativeSymbol: config.nativeSymbol,
+    nativeDecimals: config.nativeDecimals,
     protocol: input.protocol,
     action: input.action,
     from: ctx.account.address,
@@ -593,7 +599,7 @@ export async function sendPreparedTransaction(
   ctx: WalletContext,
   plan: TransactionPlan
 ): Promise<SentTransactionResult> {
-  const config = ctx.chains[plan.chain];
+  const config = getChainConfig(ctx.chains, plan.chain);
   const publicClient = getPublicClient(config);
   const walletClient = getWalletClient(config, ctx.account);
   ctx.logger.log("web3 rpc call", {
@@ -717,7 +723,7 @@ async function resolveErc20Metadata(
     return { symbol: token.symbol, decimals: token.decimals };
   }
 
-  const config = ctx.chains[chainKey];
+  const config = getChainConfig(ctx.chains, chainKey);
   const publicClient = getPublicClient(config);
   const [symbol, decimals] = await Promise.all([
     token.symbol ??

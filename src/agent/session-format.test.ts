@@ -9,6 +9,7 @@ const monadPlan: NativeTransferPlan = {
   chain: "base",
   chainName: "Base",
   nativeSymbol: "ETH",
+  nativeDecimals: 18,
   from: "0x0000000000000000000000000000000000000001",
   to: "0x0000000000000000000000000000000000000002",
   amount: "1",
@@ -23,4 +24,14 @@ test("formatTransactionPlan renders the chain's native symbol for fees", () => {
   assert.match(out, /ETH/);
   assert.doesNotMatch(out, /MON/);
   assert.doesNotMatch(out, /CFX/);
+});
+
+test("formatTransactionPlan renders native fees with the chain's decimals", () => {
+  const out = formatTransactionPlan({
+    ...monadPlan,
+    nativeSymbol: "SIX",
+    nativeDecimals: 6,
+    estimatedFee: 12_345n
+  });
+  assert.match(out, /预估费用：0\.012345 SIX/);
 });

@@ -1,5 +1,4 @@
 import {
-  formatEther,
   formatUnits,
   getAddress,
   parseAbiItem,
@@ -7,6 +6,7 @@ import {
   type Hex
 } from "viem";
 import type { ChainKey } from "../chains/index.js";
+import { getChainConfig } from "../chains/index.js";
 import { getPublicClient, type Erc20TokenInput, type WalletContext } from "../wallet/client.js";
 import { redactUrl } from "../logger.js";
 
@@ -75,7 +75,7 @@ export async function getNativeTransferHistory(
     limit?: number;
   }
 ): Promise<NativeTransferHistoryEntry[]> {
-  const config = ctx.chains[input.chain];
+  const config = getChainConfig(ctx.chains, input.chain);
   const address = getAddress(input.address ?? ctx.account.address);
   const scanApi = scanApis[input.chain];
   if (!scanApi?.apiUrl) {
@@ -120,7 +120,16 @@ export async function getNativeTransferHistory(
   }
 
   return payload.result
-    .map((item) => normalizeNativeScanTx(item, input.chain, config.displayName, config.chain.nativeCurrency.symbol, address))
+    .map((item) =>
+      normalizeNativeScanTx(
+        item,
+        input.chain,
+        config.displayName,
+        config.nativeSymbol,
+        config.nativeDecimals,
+        address
+      )
+    )
     .filter((item): item is NativeTransferHistoryEntry => Boolean(item))
     .slice(0, input.limit ?? 20);
 }
@@ -137,7 +146,7 @@ export async function getErc20TransferHistory(
     limit?: number;
   }
 ): Promise<Erc20TransferHistoryEntry[]> {
-  const config = ctx.chains[input.chain];
+  const config = getChainConfig(ctx.chains, input.chain);
   const publicClient = getPublicClient(config);
   const address = getAddress(input.address ?? ctx.account.address);
   const latestBlock = await publicClient.getBlockNumber();
@@ -227,6 +236,7 @@ function normalizeNativeScanTx(
   chain: ChainKey,
   chainName: string,
   symbol: string,
+  decimals: number,
   address: Address
 ): NativeTransferHistoryEntry | undefined {
   if (!value || typeof value !== "object") {
@@ -251,7 +261,7 @@ function normalizeNativeScanTx(
     timestamp: tx.timeStamp ? Number(tx.timeStamp) : undefined,
     from,
     to,
-    value: formatEther(rawValue),
+    value: formatUnits(rawValue, decimals),
     rawValue: rawValue.toString(),
     symbol,
     direction: getDirection(address, from, to),
@@ -284,7 +294,7 @@ async function readTokenMetadata(
   chain: ChainKey,
   token: Erc20TokenInput
 ): Promise<{ symbol: string; decimals: number }> {
-  const client = getPublicClient(ctx.chains[chain]);
+  const client = getPublicClient(getChainConfig(ctx.chains, chain));
   const [symbol, decimals] = await Promise.all([
     token.symbol ??
       client

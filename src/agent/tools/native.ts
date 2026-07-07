@@ -20,6 +20,8 @@ function serializeNativeTransferPlan(plan: NativeTransferPlan) {
     kind: plan.kind,
     chain: plan.chain,
     chainName: plan.chainName,
+    nativeSymbol: plan.nativeSymbol,
+    nativeDecimals: plan.nativeDecimals,
     from: plan.from,
     to: plan.to,
     amount: plan.amount,

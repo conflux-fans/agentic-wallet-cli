@@ -40,7 +40,7 @@ function optionalAddress(name: string): `0x${string}` | undefined {
 export function loadEnv(): AppEnv {
   const chains: Record<string, ChainEnvConfig> = {};
   for (const def of CHAIN_DEFINITIONS) {
-    const KEY = def.key.toUpperCase();
+    const KEY = def.envPrefix ?? def.key.toUpperCase();
     const tokens: Record<string, `0x${string}`> = {};
     for (const symbol of Object.keys(def.defaultTokens ?? {})) {
       const override = optionalAddress(`${KEY}_${symbol}_ADDRESS`);

@@ -81,9 +81,9 @@ export function formatTransactionPlan(plan: TransactionPlan): string {
       `发送方：${plan.from}`,
       `合约：${plan.to}`,
       ...plan.summary,
-      `Value：${formatNativeTransactionAmount(plan.nativeSymbol, plan.value)}`,
+      `Value：${formatNativeTransactionAmount(plan.nativeSymbol, plan.nativeDecimals, plan.value)}`,
       `预估 gas：${plan.estimatedGas.toString()}`,
-      `预估费用：${formatNativeTransactionAmount(plan.nativeSymbol, plan.estimatedFee)}`,
+      `预估费用：${formatNativeTransactionAmount(plan.nativeSymbol, plan.nativeDecimals, plan.estimatedFee)}`,
       "",
       "确认发送吗？输入“确认”发送，或输入“取消”放弃。"
     ].join("\n");
@@ -99,7 +99,7 @@ export function formatTransactionPlan(plan: TransactionPlan): string {
       `接收方：${plan.to}`,
       `数量：${plan.amount} ${plan.tokenSymbol}`,
       `预估 gas：${plan.estimatedGas.toString()}`,
-      `预估费用：${formatNativeTransactionAmount(plan.nativeSymbol, plan.estimatedFee)}`,
+      `预估费用：${formatNativeTransactionAmount(plan.nativeSymbol, plan.nativeDecimals, plan.estimatedFee)}`,
       "",
       "确认发送吗？输入“确认”发送，或输入“取消”放弃。"
     ].join("\n");
@@ -115,7 +115,7 @@ export function formatTransactionPlan(plan: TransactionPlan): string {
       `Spender：${plan.spender}`,
       `数量：${plan.amount} ${plan.tokenSymbol}`,
       `预估 gas：${plan.estimatedGas.toString()}`,
-      `预估费用：${formatNativeTransactionAmount(plan.nativeSymbol, plan.estimatedFee)}`,
+      `预估费用：${formatNativeTransactionAmount(plan.nativeSymbol, plan.nativeDecimals, plan.estimatedFee)}`,
       "",
       "确认发送吗？输入“确认”发送，或输入“取消”放弃。"
     ].join("\n");
@@ -128,7 +128,7 @@ export function formatTransactionPlan(plan: TransactionPlan): string {
     `接收方：${plan.to}`,
     `数量：${plan.amount} ${plan.symbol}`,
     `预估 gas：${plan.estimatedGas.toString()}`,
-    `预估费用：${formatNativeTransactionAmount(plan.nativeSymbol, plan.estimatedFee)}`,
+    `预估费用：${formatNativeTransactionAmount(plan.nativeSymbol, plan.nativeDecimals, plan.estimatedFee)}`,
     "",
     "确认发送吗？输入“确认”发送，或输入“取消”放弃。"
   ].join("\n");
@@ -206,8 +206,8 @@ function formatFlowStepStatus(status: "success" | "reverted" | "pending" | "unkn
   return "未知";
 }
 
-function formatNativeTransactionAmount(symbol: string, value: bigint): string {
-  return `${padNativeDecimals(formatUnits(value, 18))} ${symbol}`;
+function formatNativeTransactionAmount(symbol: string, decimals: number, value: bigint): string {
+  return `${padNativeDecimals(formatUnits(value, decimals))} ${symbol}`;
 }
 
 function padNativeDecimals(value: string): string {

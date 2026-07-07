@@ -4,7 +4,7 @@ import { createPublicClient, http, type Address, type Hex } from "viem";
 import type { ToolSet } from "ai";
 import { z } from "zod";
 import type { AddressBook } from "../address-book/index.js";
-import { chainEnumSchema, type ChainConfig, type ChainKey } from "../chains/index.js";
+import { chainEnumSchema, getChainConfig, type ChainConfig, type ChainKey } from "../chains/index.js";
 import type { AgentSession } from "../agent/session.js";
 import type { TransactionFlow } from "../agent/session.js";
 import type { Logger } from "../logger.js";
@@ -112,7 +112,7 @@ export function createSkillContext(input: {
     },
     rpc: {
       publicClient(chain) {
-        const config = input.chains[chain];
+        const config = getChainConfig(input.chains, chain);
         return createPublicClient({
           chain: config.chain,
           transport: http(config.rpcUrl)
