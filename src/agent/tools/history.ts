@@ -52,13 +52,15 @@ export function createHistoryTools(
   registry: TokenRegistry,
   scanApis: ScanApiConfig
 ) {
-  const chainSchema = chainEnumSchema(Object.keys(wallet.chains));
+  const chainKeys = Object.keys(wallet.chains);
+  const chainSchema = chainEnumSchema(chainKeys);
+  const chainDesc = `链标识，可选值：${chainKeys.join("、")}`;
   return {
     getNativeTransferHistory: tool({
       description:
         "查询 native 资产转账历史。依赖链对应的 scan API。address 可选，默认当前钱包。limit 默认 20。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         address: z.string().optional().describe("要查询的 EVM 地址，默认当前钱包"),
         startBlock: z.string().optional().describe("起始区块，十进制字符串"),
         endBlock: z.string().optional().describe("结束区块，十进制字符串"),
@@ -86,7 +88,7 @@ export function createHistoryTools(
       description:
         "查询 ERC20 Transfer 历史。通过 RPC eth_getLogs 查询，可指定 tokenSymbol/tokenAddress；不指定 token 时查询区块范围内所有 ERC20 Transfer。address 可选，默认当前钱包。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: z.string().optional().describe("token symbol，例如 USDT、USDC"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         address: z.string().optional().describe("要查询的 EVM 地址，默认当前钱包"),

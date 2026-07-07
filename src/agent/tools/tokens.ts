@@ -19,13 +19,15 @@ export function createTokenTools(
   chains: Record<ChainKey, ChainConfig>,
   logger: Logger
 ) {
-  const chainSchema = chainEnumSchema(Object.keys(chains));
+  const chainKeys = Object.keys(chains);
+  const chainSchema = chainEnumSchema(chainKeys);
+  const chainDesc = `链标识，可选值：${chainKeys.join("、")}`;
   return {
     getWhitelistedTokens: tool({
       description:
         "查询指定链当前白名单支持的 ERC20 token。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad")
+        chain: chainSchema.describe(chainDesc)
       }),
       execute: async ({ chain }) => {
         logger.log("agent tool call", {
@@ -40,7 +42,7 @@ export function createTokenTools(
       description:
         "向指定链的 ERC20 token 白名单增加 token。只需要 chain 和 address；会通过 RPC 读取 ERC20 name、symbol、decimals。symbol/name/decimals 可选，用于覆盖链上读取结果。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         address: z.string().describe("ERC20 token 合约地址"),
         symbol: z.string().optional().describe("可选覆盖 token symbol，例如 DAI"),
         decimals: z.number().int().min(0).max(255).optional().describe("可选覆盖 token decimals"),
@@ -69,7 +71,7 @@ export function createTokenTools(
       description:
         "修改指定链 token 白名单中的 token 地址、名称或 decimals。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         symbol: z.string().describe("要修改的 token symbol"),
         address: z.string().optional().describe("新的 ERC20 token 合约地址"),
         decimals: z.number().int().min(0).max(255).optional().describe("新的 token decimals"),
@@ -91,7 +93,7 @@ export function createTokenTools(
     removeWhitelistedToken: tool({
       description: "从指定链的 ERC20 token 白名单删除 token。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         symbol: z.string().describe("要删除的 token symbol")
       }),
       execute: async ({ chain, symbol }) => {

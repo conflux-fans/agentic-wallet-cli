@@ -96,13 +96,15 @@ export function createErc20Tools(
   session: AgentSession,
   addressBook?: AddressBook
 ) {
-  const chainSchema = chainEnumSchema(Object.keys(ctx.chains));
+  const chainKeys = Object.keys(ctx.chains);
+  const chainSchema = chainEnumSchema(chainKeys);
+  const chainDesc = `链标识，可选值：${chainKeys.join("、")}`;
   return {
     getErc20Balance: tool({
       description:
         "查询 ERC20 token 余额。可使用白名单 tokenSymbol(USDT/USDC)，也可直接指定 tokenAddress。address 可选，默认当前钱包地址。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: tokenSymbolSchema.describe("token symbol，例如 USDT、USDC 或自定义 token symbol"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         address: z.string().optional().describe("要查询余额的 EVM 地址，默认当前钱包")
@@ -129,7 +131,7 @@ export function createErc20Tools(
       description:
         "查询 ERC20 allowance/approve 授权额度。owner 可选，默认当前钱包地址；spender 必填。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: tokenSymbolSchema.describe("token symbol，例如 USDT、USDC 或自定义 token symbol"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         owner: z.string().optional().describe("授权方地址，默认当前钱包"),
@@ -170,7 +172,7 @@ export function createErc20Tools(
       description:
         "准备 ERC20 token 转账交易。只生成待确认交易计划，不会签名或发送。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: tokenSymbolSchema.describe("token symbol，例如 USDT、USDC 或自定义 token symbol"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         to: z.string().describe("接收方 EVM 地址或地址簿联系人名称"),
@@ -202,7 +204,7 @@ export function createErc20Tools(
       description:
         "准备 ERC20 approve 授权交易。只生成待确认交易计划，不会签名或发送。",
       inputSchema: z.object({
-        chain: chainSchema.describe("链标识，只能是 conflux 或 monad"),
+        chain: chainSchema.describe(chainDesc),
         tokenSymbol: tokenSymbolSchema.describe("token symbol，例如 USDT、USDC 或自定义 token symbol"),
         tokenAddress: z.string().optional().describe("ERC20 token 合约地址"),
         spender: z.string().describe("被授权 spender 地址或地址簿联系人名称"),
